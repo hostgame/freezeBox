@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+
+    <title>Nebulas freezeBox smart contract</title>
+    <link rel="stylesheet" href="index.css">
+
+</head>
+
+<body>
+    <div class="contenner">
+        <div class="logo">
+            <div class="img">
+                <img src="img/logo.png" alt="">
+            </div>
+            <div class="name">Create deals with guarantor</div>
+        </div>
+        <div class="noExtension hide" id="noExtension">
+            NOTE: Please install <a target="_blank" href="https://github.com/ChengOrangeJu/WebExtensionWallet">WebExtensionWallet</a>  to use NameSend
+        </div>
+        <div class="menu">
+            <button class="active" id="create_menu">Create</button>
+            <button id="manage_menu">Manage</button>
+            <button id="about_menu">About</button>
+        </div>
+
+
+        <div class="app_form create">
+            <input type="text" class="member_input" name="member[]" placeholder="member address" disabled><br/>
+            <input type="text" class="member_input" name="member[]" placeholder="member address" disabled><br/>
+            <a href="#" id="add_member">+ add member</a>
+            <input id="guarantor" type="text" placeholder="guarantor address" disabled>
+            <input id="comission" type="number" placeholder="comission" min="0" step="0.1" max="100" disabled> %<br/>
+            <input id="name" type="text" placeholder="name" disabled>
+            <button id="create" disabled>create</button>
+        </div>
+
+
+        <div class="app_form manage hide">
+            <input id="name_for_manage" type="text" placeholder="name" disabled>
+            <button id="manage" disabled>manage</button>
+            <div id="manage_info" class="hide">
+                <div class="manage_info_action">
+                    <button id="deposit_action">deposit</button>
+                    <button id="freeze_action">freeze</button>
+                    <button id="open_action">open</button>
+                </div>
+                <h2 class="manage_info_name">Name</h2>
+                <div class="manage_info_status">Status: <span>Open</span></div>
+                <div class="manage_info_guarantor">Guarantor: <span>asd</span></div>
+                <div class="manage_info_comission">Comission: <span>asd</span></div>
+                <div class="manage_info_bank">Bank: <span>asd</span></div>
+                Members:
+                <ul class="manage_info_members">
+                </ul>
+            </div>
+        </div>
+
+
+        <div class="app_form about hide">
+            <p>Hello!</p>
+            <p><i>Use case #1.</i> You can make a deal between buyer and seller with guarantor using freezeBox. For example you create new freezebox with buyer and seller as members and person trusted by both of you as guarantor. Then buyer send deposit money to freezebox, guarantor freeze the box, seller send product to buyer. If product is ok, then guarantor takeout money from the box to seller. If product isn't ok, then guarantor take money back to buyer. Guarantor can not withdraw money from box to his own address.</p>
+            <p><i>Use case #2.</i> You can make a bet on some event with your friend(s) and some other person will decide who wins. For example yo create new freezebox with three members and one guarantor. All members deposits their bet, guarantor freeze the box and after event happens, guarantor withdraw all deposits to one person.</p>
+        </div>
+
+    </div>
+    <script src=lib/jquery-3.3.1.min.js></script>
+    <script src=lib/nebPay.js></script>
+    <script>
+    var NebPay = require("nebpay");
+    var nebPay = new NebPay();
+    var dappAddress = "n1gjM5743XsKRZ3wZDuZfEFXPjSJCN7dcCS";
+    var currentFreezeBox;
+
+    if(typeof(webExtensionWallet) === "undefined"){
+        //alert ("Extension wallet is not installed, please install it first.")
+        $("#noExtension").removeClass("hide")
+    }else{
+        $("#create").attr("disabled",false);
+        $("#guarantor").attr("disabled",false);
+        $("#name").attr("disabled",false);
+        $(".member_input").attr("disabled",false);
+        $("#manage").attr("disabled",false);
+        $("#name_for_manage").attr("disabled",false);
+        $("#comission").attr("disabled",false);
+    }
+
+    $(".menu button").click(function(e){
+        $(".menu button.active").removeClass("active");
+        $(e.target).addClass("active");
+        $(".app_form").addClass("hide");
+    });
+
+    $("#create_menu").click(function(){
+        $(".app_form.create").removeClass("hide");
+    });
+
+    $("#about_menu").click(function(){
+        $(".app_form.about").removeClass("hide");
+    });
+
+    $("#manage_menu").click(function(){
+        $(".app_form.manage").removeClass("hide");
+    });
+
+    $("#add_member").click(function(){
+        if(typeof(webExtensionWallet) === "undefined"){
+            $(".member_input").last().next().after('<input type="text" class="member_input" name="member[]" placeholder="member address" disabled><br/>');
+        }else{
+            $(".member_input").last().next().after('<input type="text" class="member_input" name="member[]" placeholder="member address"><br/>');            
+        }
+    });
+
+    $("#create").click(function(){
+        var to = dappAddress;
+        var value = "0";
+        var callFunction = "create";
+        var members = [];
+        $(".member_input").each(function(e){members.push($(this).val())});
+
+        var callArgs = JSON.stringify([$("#name").val(), $("#guarantor").val(), JSON.stringify(members), $("#comission").val()]);
+        console.log(callArgs);
+        nebPay.simulateCall(to, value, callFunction, callArgs, {
+            listener: function(resp) {
+                var result = JSON.parse(resp.result);
+                console.log("CREATING: return of rpc call: " + JSON.stringify(result));
+                if(result.success){
+                    nebPay.call(to, value, callFunction, callArgs, {
+                        listener: function(resp) {
+                        }
+                    });                    
+                } else {
+                    alert(result.message);
+                }
+            }
+        });
+
+    });
+
+    $("#deposit_action").click(function(){
+        var to = dappAddress;
+        var value = "0.5";
+        var callFunction = "deposit";
+        var callArgs = JSON.stringify([$("#name_for_manage").val()]);
+        console.log(callArgs);
+        nebPay.simulateCall(to, value, callFunction, callArgs, {
+            listener: function(resp) {
+                var result = JSON.parse(resp.result);
+                console.log("DEPOSIT: return of rpc call: ");
+                console.log(result);
+                if(result.success){
+                    nebPay.call(to, value, callFunction, callArgs, {
+                        listener: function(){},
+                    });
+                }else{
+                    alert(result.message);
+                }
+            }
+        });
+    });
+
+    $("#freeze_action").click(function(){
+        var to = dappAddress;
+        var value = "0";
+        var callFunction = "freeze";
+        var callArgs = JSON.stringify([$("#name_for_manage").val()]);
+        console.log(callArgs);
+        nebPay.simulateCall(to, value, callFunction, callArgs, {
+            listener: function(resp) {
+                var result = JSON.parse(resp.result);
+                console.log("FREEZE: return of rpc call: ");
+                console.log(result);
+                if(result.success){
+                    nebPay.call(to, value, callFunction, callArgs, {
+                        listener: function(){},
+                    });
+                }else{
+                    alert(result.message);
+                }
+            }
+        });
+    });
+
+    $("#open_action").click(function(){
+        var beneficiary = prompt("Who will receive all money?");
+        var to = dappAddress;
+        var value = "0";
+        var callFunction = "open";
+        var callArgs = JSON.stringify([$("#name_for_manage").val(), beneficiary]);
+        console.log(callArgs);
+        nebPay.simulateCall(to, value, callFunction, callArgs, {
+            listener: function(resp) {
+                var result = JSON.parse(resp.result);
+                console.log("FREEZE: return of rpc call: ");
+                console.log(result);
+                if(result.success){
+                    nebPay.call(to, value, callFunction, callArgs, {
+                        listener: function(){},
+                    });
+                }else{
+                    alert(result.message);
+                }
+            }
+        });
+    });
+
+    $("#manage").click(function(){
+        var to = dappAddress;
+        var value = "0";
+        var callFunction = "info";
+        var callArgs = JSON.stringify([$("#name_for_manage").val()]);
+        console.log(callArgs);
+        nebPay.simulateCall(to, value, callFunction, callArgs, {
+            listener: function(resp) {
+                var result = JSON.parse(resp.result);
+                console.log("MANAGE: return of rpc call: ");
+                console.log(result);
+                if(result.success){
+                    currentFreezeBox = result.name;
+                    $(".manage_info_name").text(result.name);
+                    $(".manage_info_guarantor span").text(result.guarantor);
+                    $(".manage_info_comission span").text(result.comission + "%");
+                    $(".manage_info_bank span").text(result.bank + " wei");
+                    if(result.status){
+                        $(".manage_info_status span").text("Frozen");
+                    }else{
+                        $(".manage_info_status span").text("Open");
+                    }
+                    Object.keys(result.members).forEach(function(address) {
+                        console.log(address, result.members[address]);
+                        var member = "<li>" + address +" (balance: "+ result.members[address] + " wei)</li>";
+                        $(".manage_info_members").append(member);
+
+                    });
+                    $("#name_for_manage").addClass("hide");
+                    $("#manage").addClass("hide");
+                    $("#manage_info").removeClass("hide");
+                        // alert("There is "+ result.amount.toString() + " available for withdraw to " + result.beneficiary.toString());
+                        // nebPay.call(to, value, callFunction, callArgs, {});
+                } else {
+                    alert(result.message);
+                }
+            }
+        });
+
+    });
+
+</script>
+</body>
+
+</html>
